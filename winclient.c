@@ -19,7 +19,7 @@
 #define MSG_TYPE_COMMD_LIST_CLIENT_RESULT       (7)
 
 
-#define SERVER_IP                           ("139.196.120.117")
+#define SERVER_IP                           ("x.x.x.x") 
 #define SERVER_PORT                         (8090)
 
 #define LOGIN_TYPE_CLIENT                   (0)
