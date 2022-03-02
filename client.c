@@ -23,7 +23,7 @@
 #define MSG_TYPE_COMMD_LIST_CLIENT_RESULT       (7)
 
 
-#define SERVER_IP                           "x.x.x.x" //公网ip
+#define SERVER_IP                           "139.196.120.117"
 #define SERVER_PORT                         8090
 
 #define LOGIN_TYPE_CLIENT                   (0)
@@ -78,8 +78,9 @@ void    send_heartbeat(void *arg);
 void    do_implement(int sockfd);
 char*   readtobuf(char *resultbuf, FILE *fp);
 int     recv_full(int sockfd, char *buf, int len);
-void    recv_tlv_buffer(int sockfd, char *buf);
-void    send_tlv_buffer(int sockfd, char *buf);
+int     send_full(int sockfd, char *buf, int len);
+int     recv_tlv_buffer(int sockfd, char *buf);
+int     send_tlv_buffer(int sockfd, char *buf);
 char*   get_command(struct commd *command_packge);
 void    send_result_packge(int sockfd, char *cmdbuf);
 void    send_login_packge(int sockfd, char *sendbuf);
@@ -297,8 +298,6 @@ int recv_full(int sockfd, char *buf, int len)
             hasrecv = hasrecv + ret;
         } else if(ret == 0) {
             printf("peer shutdown\n");
-            //close(sockfd);
-            //exit(0);
             break;
         } else {
             printf("recv failure: %s\n", strerror(errno));
@@ -310,67 +309,89 @@ int recv_full(int sockfd, char *buf, int len)
     return hasrecv;
 }
 
-void recv_tlv_buffer(int sockfd, char *buf)
+int  recv_tlv_buffer(int sockfd, char *buf)
 {
     int n = 0;
+    int ret = 0;
+    int recvheadflag = 0;
     char *pbuf = buf;
     int headlen = sizeof(MSG);
     MSG *msg = (MSG *)buf;
     
     if((n = recv_full(sockfd, pbuf, headlen)) > 0) {//记得打括号
         if(n == headlen) {
+            recvheadflag = 1;
             printf("recv the msg head:%d bytes\n", n);
+            ret = 1;
+        } else {
+            ret = 0;
         }
     }
-    
-    if((n = recv_full(sockfd, &pbuf[headlen], msg->length)) > 0) {
-        if(n == msg->length) {
-            printf("recv the msg tail:%d bytes\n", n);
+    if(((recvheadflag) && (msg->length > 0))) {
+        if((n = recv_full(sockfd, &pbuf[headlen], msg->length)) > 0) {
+            if(n == msg->length) {
+                printf("recv the msg tail:%d bytes\n", n);
+                ret = 1;
+            } else {
+                ret = 0;
+            } 
         }
     }
-    
-    return ;
+    return ret;
 }
 
-void send_tlv_buffer(int sockfd, char *buf)
+int send_full(int sockfd, char *buf, int len)
 {
+    int hassend = 0;
+    int ret;
+
+    while(hassend < len) {
+
+        if( (ret = send(sockfd, buf, len, 0)) > 0 ) {
+            hassend = hassend + ret;                      
+        } else if (ret == 0) {
+            printf("peer shutdown!\n");
+            break;
+        } else {
+            printf("send fairlure with error :%s\n", strerror(errno));
+            break;
+        }
+    }
+
+    return hassend;
+}
+
+int send_tlv_buffer(int sockfd, char *buf)
+{
+    int ret = 0;
     int n = 0;
+    int sendheadflag = 0;
     char *pbuf = buf;
     int headlen = sizeof(MSG);
     MSG *msg = (MSG *)buf;
     
-    if((n = send(sockfd, pbuf, headlen, 0)) > 0) {
+    if((n = send_full(sockfd, pbuf, headlen)) > 0) {
         if(n == headlen) {
-            printf("send the msg head\n");
+            //printf("send the msg head\n");
+            sendheadflag = 1;
+            ret = 1;
         } else {
-            send(sockfd, &pbuf[n], headlen - n, 0);
-        }
-    } else {
-        if(n == 0) {
-            printf("kernel buffer is full\n");
-        } else {
-            printf("send error:%s\n", strerror(errno));
+            ret = 0;
         }
     }
     
-    if(msg->length > 0) {
-        if((n = send(sockfd, &pbuf[headlen], msg->length, 0)) > 0) {
+    if((sendheadflag) && (msg->length > 0)) {
+        if((n = send_full(sockfd, &pbuf[headlen], msg->length)) > 0) {
             if(n == msg->length) {
-                printf("send the msg tail\n");
+                //printf("send the msg tail\n");
+                ret = 1;
             } else {
-                send(sockfd, &pbuf[n], msg->length - n, 0);
+                ret = 0;
             }
-        } else {
-            if(n == 0) {
-                printf("kernel buffer is full\n");
-            } else {
-                printf("send error:%s\n", strerror(errno));
-            }        
-        }
+        } 
     }
     
-    
-    return ;
+    return ret;
 }
 
 
